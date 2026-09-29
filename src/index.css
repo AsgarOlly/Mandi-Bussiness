@@ -665,14 +665,16 @@ body {
   border: 1px solid var(--border-subtle);
 }
 
-.erp-table, .table {
+.erp-table,
+.table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
   font-size: 0.85rem;
 }
 
-.erp-table th, .table th {
+.erp-table th,
+.table th {
   background: var(--bg-table-header);
   color: var(--text-secondary);
   font-weight: 700;
@@ -685,7 +687,8 @@ body {
   text-align: left;
 }
 
-.erp-table td, .table td {
+.erp-table td,
+.table td {
   padding: 13px 16px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-main);
@@ -693,7 +696,8 @@ body {
   vertical-align: middle;
 }
 
-.erp-table tr:hover td, .table tr:hover td {
+.erp-table tr:hover td,
+.table tr:hover td {
   background: var(--bg-table-hover);
 }
 
@@ -3183,7 +3187,8 @@ select.form-control option {
   transition: background 0.15s;
 }
 
-.suggestion-item:hover, .suggestion-item.active {
+.suggestion-item:hover,
+.suggestion-item.active {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.08) 100%);
 }
 
@@ -3363,6 +3368,7 @@ select.form-control option {
     opacity: 0;
     transform: scale(0.96) translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -3390,13 +3396,16 @@ select.form-control option {
 .mandi-modal-body::-webkit-scrollbar {
   width: 6px;
 }
+
 .mandi-modal-body::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.05);
 }
+
 .mandi-modal-body::-webkit-scrollbar-thumb {
   background: rgba(100, 116, 139, 0.4);
   border-radius: 4px;
 }
+
 .mandi-modal-body::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.7);
 }
@@ -3611,6 +3620,7 @@ select.form-control option {
     opacity: 0;
     transform: scale(0.94) translateY(12px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -4093,6 +4103,7 @@ div[style*="overflow-x"] {
 
 /* 8. Touch Targets for Coarse Pointers (Touchscreens, Tablets & Phones) */
 @media (pointer: coarse) {
+
   button,
   .action-btn-pill,
   .nav-item,
@@ -4100,5 +4111,626 @@ div[style*="overflow-x"] {
   input,
   select {
     min-height: 42px;
+  }
+}
+
+/* =============================================================================
+   9. BOARD [PAGE] & BIKRI PARCHI DAILY TRADING STYLES
+   ============================================================================= */
+.board-page-container {
+  animation: fadeIn 0.25s ease-out;
+}
+
+.board-lots-row::-webkit-scrollbar {
+  height: 6px;
+}
+
+.board-lots-row::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+}
+
+.board-lots-row::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.35);
+  border-radius: 10px;
+}
+
+.board-lots-row::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.6);
+}
+
+.board-lot-card {
+  user-select: none;
+}
+
+.board-lot-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.board-lot-card.active {
+  animation: lotPulse 0.3s ease;
+}
+
+@keyframes lotPulse {
+  0% {
+    transform: scale(0.96);
+  }
+
+  50% {
+    transform: scale(1.02);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.board-add-lot-card:hover {
+  border-color: #059669 !important;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.2);
+}
+
+[data-theme="dark"] .board-top-header {
+  background: linear-gradient(135deg, #06110a 0%, #0d2116 100%) !important;
+  border-color: rgba(52, 211, 153, 0.18) !important;
+}
+
+[data-theme="dark"] .board-lot-card {
+  background: #0d1e15 !important;
+  border-color: rgba(52, 211, 153, 0.16) !important;
+}
+
+[data-theme="dark"] .board-lot-card.active {
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.16) 0%, #0d1e15 100%) !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25) !important;
+}
+
+[data-theme="dark"] .board-lot-summary-bar {
+  background: #0d1e15 !important;
+  border-color: rgba(52, 211, 153, 0.28) !important;
+}
+
+[data-theme="dark"] .board-bikri-container {
+  background: #0d1e15 !important;
+  border-color: rgba(52, 211, 153, 0.18) !important;
+}
+
+/* =============================================================================
+   BOARD HEADER: UNDER DATE SALES STRIP & COMPACT MOBILE/TAB RESPONSIVENESS
+   ============================================================================= */
+.board-header-left-col {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.board-header-right-col {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.board-sales-pill {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.board-sales-pill:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.board-sales-pill.pill-cash {
+  background: rgba(16, 185, 129, 0.16) !important;
+  border: 1.5px solid rgba(16, 185, 129, 0.5) !important;
+}
+
+.board-sales-pill.pill-udhaar {
+  background: rgba(239, 68, 68, 0.16) !important;
+  border: 1.5px solid rgba(239, 68, 68, 0.5) !important;
+}
+
+.board-sales-pill.pill-total {
+  background: rgba(59, 130, 246, 0.16) !important;
+  border: 1.5px solid rgba(59, 130, 246, 0.5) !important;
+}
+
+/* =============================================================================
+   DAILY INWARD LOTS SECTION: RESPONSIVE HEADER & 2-COLUMN PHONE GRID
+   ============================================================================= */
+.board-inward-section {
+  width: 100%;
+}
+
+.board-inward-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 2px 4px;
+  width: 100%;
+}
+
+.board-inward-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.board-inward-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.board-inward-heading {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.board-inward-count-badge {
+  background: rgba(16, 185, 129, 0.14);
+  color: #10b981;
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.board-inward-subtitle {
+  font-size: 0.78rem;
+  color: #10b981;
+  font-weight: 700;
+}
+
+.board-inward-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-inward-search-box {
+  position: relative;
+  width: 180px;
+}
+
+.board-inward-search-input {
+  width: 100%;
+  padding: 6px 10px 6px 28px;
+  font-size: 0.8rem;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.board-inward-search-input:focus {
+  border-color: #10b981;
+}
+
+.board-inward-search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.board-inward-filter-btn {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.board-inward-filter-btn.active {
+  background: #10b981 !important;
+  color: #ffffff !important;
+  border-color: #059669 !important;
+}
+
+/* Base Desktop Grid */
+.board-lots-row {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+  gap: 12px !important;
+  width: 100% !important;
+  align-items: stretch !important;
+}
+
+.board-lot-card,
+.board-add-lot-card {
+  width: 100% !important;
+  min-height: 115px !important;
+  box-sizing: border-box !important;
+}
+
+/* Base Desktop Grid for Bikri Parchi Form (All 6 fields in a sleek, fast row) */
+.board-bikri-form-grid {
+  display: grid !important;
+  grid-template-columns: 2.2fr 1fr 1fr 1.2fr 1.4fr 1.3fr !important;
+  gap: 12px !important;
+  align-items: flex-end !important;
+  width: 100% !important;
+}
+
+.board-bikri-field-name {
+  min-width: 0 !important;
+}
+
+.board-bikri-field-boxes,
+.board-bikri-field-rate,
+.board-bikri-field-total,
+.board-bikri-field-mode,
+.board-bikri-field-submit {
+  min-width: 0 !important;
+}
+
+.board-bikri-field-submit button {
+  width: 100% !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  white-space: nowrap !important;
+}
+
+/* Tablets & iPads (769px to 1024px) */
+@media (max-width: 1024px) {
+  .board-top-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    padding: 12px 16px !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+
+  .board-header-left-col {
+    flex: none !important;
+    width: 100% !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  .board-header-right-col {
+    flex: none !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  .board-date-switcher {
+    justify-content: space-between !important;
+    width: 100% !important;
+    padding: 4px 8px !important;
+  }
+
+  .board-under-date-strip {
+    justify-content: stretch !important;
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .board-sales-pill {
+    justify-content: center !important;
+    width: 100% !important;
+    padding: 5px 8px !important;
+    font-size: 0.76rem !important;
+  }
+
+  .board-lots-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .board-lot-card,
+  .board-add-lot-card {
+    min-height: 105px !important;
+    padding: 10px !important;
+  }
+
+  .board-lot-card-title {
+    font-size: 0.88rem !important;
+  }
+
+  .board-lot-card-fruit {
+    font-size: 0.78rem !important;
+  }
+
+  .board-lot-card-boxes {
+    font-size: 0.96rem !important;
+  }
+
+  .board-lot-summary-bar {
+    padding: 12px 16px !important;
+    gap: 10px !important;
+  }
+
+  /* Bikri Form 3-Column Balanced Grid on Tablets */
+  .board-bikri-form-grid {
+    grid-template-columns: 2fr 1fr 1fr !important;
+    gap: 12px 14px !important;
+  }
+
+  .board-bikri-field-name {
+    grid-column: span 1 !important;
+  }
+
+  .board-bikri-field-boxes,
+  .board-bikri-field-rate,
+  .board-bikri-field-total,
+  .board-bikri-field-mode,
+  .board-bikri-field-submit {
+    grid-column: span 1 !important;
+  }
+}
+
+/* Small Tablets & Phablets (601px to 768px) */
+@media (max-width: 768px) {
+  .board-inward-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .board-inward-title-group {
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+
+  .board-inward-subtitle {
+    white-space: normal !important;
+    font-size: 0.74rem !important;
+  }
+
+  .board-inward-controls {
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  .board-inward-search-box {
+    width: 100% !important;
+  }
+
+  .board-inward-filter-btn {
+    height: 100% !important;
+    padding: 7px 12px !important;
+  }
+
+  .board-lots-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .board-lot-card,
+  .board-add-lot-card {
+    min-height: 98px !important;
+    padding: 9px 10px !important;
+    border-radius: 12px !important;
+  }
+
+  .board-lot-card-title {
+    font-size: 0.84rem !important;
+  }
+
+  .board-lot-card-fruit {
+    font-size: 0.74rem !important;
+  }
+
+  .board-lot-card-boxes {
+    font-size: 0.92rem !important;
+  }
+
+  .board-lot-summary-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 10px 14px !important;
+    gap: 10px !important;
+  }
+
+  .board-lot-summary-left {
+    width: 100% !important;
+  }
+
+  .board-lot-summary-right {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .board-bikri-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px 12px !important;
+  }
+
+  .board-bikri-field-name {
+    grid-column: span 2 !important;
+  }
+
+  .board-bikri-field-boxes,
+  .board-bikri-field-rate,
+  .board-bikri-field-total,
+  .board-bikri-field-mode {
+    grid-column: span 1 !important;
+  }
+
+  .board-bikri-field-submit {
+    grid-column: span 2 !important;
+  }
+
+  .board-bikri-field-submit button {
+    height: 44px !important;
+    min-height: 44px !important;
+  }
+}
+
+/* ALL Mobile Phones (<= 600px) - STRICT 2-COLUMN CARDS GRID */
+@media (max-width: 600px) {
+  .board-top-header {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+    border-radius: 12px !important;
+  }
+
+  .board-header-left-col {
+    gap: 6px !important;
+  }
+
+  .board-header-left-col h1 {
+    font-size: 1.15rem !important;
+  }
+
+  .board-date-switcher {
+    padding: 3px 6px !important;
+    gap: 4px !important;
+  }
+
+  .board-under-date-strip {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+  }
+
+  .board-sales-pill.pill-total {
+    grid-column: span 2 !important;
+  }
+
+  .board-sales-pill {
+    padding: 4px 6px !important;
+    font-size: 0.72rem !important;
+  }
+
+  /* Daily Inward Lots Header on Mobile */
+  .board-inward-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+    padding: 0 !important;
+  }
+
+  .board-inward-title-group {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 2px !important;
+  }
+
+  .board-inward-heading {
+    font-size: 0.82rem !important;
+  }
+
+  .board-inward-subtitle {
+    font-size: 0.72rem !important;
+    white-space: normal !important;
+    line-height: 1.3 !important;
+  }
+
+  .board-inward-controls {
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    width: 100% !important;
+    gap: 6px !important;
+  }
+
+  .board-inward-search-box {
+    width: 100% !important;
+  }
+
+  .board-inward-search-input {
+    height: 36px !important;
+    padding: 6px 10px 6px 28px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .board-inward-filter-btn {
+    height: 36px !important;
+    padding: 6px 10px !important;
+    font-size: 0.74rem !important;
+  }
+
+  /* STRICT 2-COLUMN GRID ON PHONES: Side-by-side Cards */
+  .board-lots-row {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .board-lot-card,
+  .board-add-lot-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 96px !important;
+    padding: 8px 10px !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+  }
+
+  .board-lot-card-title {
+    font-size: 0.84rem !important;
+  }
+
+  .board-lot-card-fruit {
+    font-size: 0.72rem !important;
+  }
+
+  .board-lot-card-boxes {
+    font-size: 0.95rem !important;
+  }
+
+  .board-lot-card-bal {
+    font-size: 0.72rem !important;
+  }
+
+  .board-add-lot-icon {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .board-add-lot-title {
+    font-size: 0.82rem !important;
+  }
+
+  .board-add-lot-sub {
+    font-size: 0.64rem !important;
+  }
+
+  .board-bikri-form-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .board-bikri-field-name {
+    grid-column: span 2 !important;
+  }
+
+  .board-bikri-field-submit {
+    grid-column: span 2 !important;
+  }
+
+  .board-bikri-field-submit button {
+    min-height: 42px !important;
   }
 }

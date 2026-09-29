@@ -34,6 +34,7 @@ import {
   Calculator
 } from 'lucide-react';
 import { api } from '../services/api';
+import BoardPageView from '../components/dashboard/BoardPageView';
 
 const getSystemDate = () => {
   const d = new Date();
@@ -60,7 +61,9 @@ function CashSaleAdminPage({
   unifiedSuppliers = [],
   purchasesList = [],
   showToast,
-  getSystemDate: gsd
+  getSystemDate: gsd,
+  supplierProfiles = [],
+  setSupplierProfiles
 }) {
   const sysDate = gsd ? gsd() : new Date().toISOString().slice(0, 10);
   const [selectedSuppName, setSelectedSuppName] = React.useState(null);
@@ -69,6 +72,8 @@ function CashSaleAdminPage({
   const [truckFilter, setTruckFilter] = React.useState('ACTIVE'); // 'ACTIVE' | 'COMPLETE' (matching Image 2)
   const [activeDetailTab, setActiveDetailTab] = React.useState('invoices'); // 'invoices' | 'payments'
   const [payFormOpen, setPayFormOpen] = React.useState(false);
+  const [deleteAllModalOpen, setDeleteAllModalOpen] = React.useState(false);
+  const [includeProfilesInDelete, setIncludeProfilesInDelete] = React.useState(false);
   const [selInvoice, setSelInvoice] = React.useState(null);
   const [payForm, setPayForm] = React.useState({
     date: sysDate,
@@ -92,7 +97,6 @@ function CashSaleAdminPage({
           id: s.id || `supp-${name}`,
           supplier_name: name,
           phone: s.phone || '',
-          city: s.city || 'Azadpur Mandi, Delhi',
           bank_name: s.bank_name || '',
           account_number: s.account_number || '',
           ifsc_code: s.ifsc_code || '',
@@ -110,7 +114,6 @@ function CashSaleAdminPage({
           id: `cs-${name}`,
           supplier_name: name,
           phone: '',
-          city: 'Azadpur Mandi, Delhi',
           bank_name: '',
           account_number: '',
           ifsc_code: '',
@@ -128,7 +131,6 @@ function CashSaleAdminPage({
           id: `cp-${name}`,
           supplier_name: name,
           phone: '',
-          city: 'Azadpur Mandi, Delhi',
           bank_name: '',
           account_number: '',
           ifsc_code: '',
@@ -146,7 +148,6 @@ function CashSaleAdminPage({
           id: `asn-${trimmed}`,
           supplier_name: trimmed,
           phone: '',
-          city: 'Azadpur Mandi, Delhi',
           bank_name: '',
           account_number: '',
           ifsc_code: '',
@@ -315,10 +316,73 @@ function CashSaleAdminPage({
     if (window.confirm('Are you sure you want to delete this payment record?')) {
       setCashSalePayments(prev => {
         const updated = prev.filter(p => p.id !== paymentId);
-        saveCashSalePayments(updated);
+        if (saveCashSalePayments) saveCashSalePayments(updated);
         return updated;
       });
       if (showToast) showToast('Payment record deleted', 'info');
+    }
+  };
+
+  // Delete All Party Khata Data (Settlements, Payments, and optionally Profiles)
+  const confirmDeleteAllPartyKhata = () => {
+    // 1. Clear settlements
+    setCashSaleSettlements([]);
+    if (saveCashSaleSettlements) saveCashSaleSettlements([]);
+    try { localStorage.removeItem('mandi_cash_sale_settlements'); } catch {}
+
+    // 2. Clear payments
+    setCashSalePayments([]);
+    if (saveCashSalePayments) saveCashSalePayments([]);
+    try { localStorage.removeItem('mandi_cash_sale_payments'); } catch {}
+
+    // 3. Clear truck settlements config
+    try { localStorage.removeItem('mandi_truck_settlements'); } catch {}
+
+    // 4. Optionally clear supplier profiles if user checked the option
+    if (includeProfilesInDelete && setSupplierProfiles) {
+      setSupplierProfiles([]);
+      try { localStorage.removeItem('dashboard_supplier_profiles'); } catch {}
+    }
+
+    setSelectedSuppName(null);
+    setDeleteAllModalOpen(false);
+    if (showToast) showToast('Party Khata ka saara data successfully delete kar diya gaya! 🗑️', 'info');
+  };
+
+  // Delete Single Settlement / Truck Invoice
+  const handleDeleteSettlement = (settlementId, truckNo) => {
+    if (window.confirm(`Kya aap truck ${truckNo ? `"${truckNo}"` : ''} ka settlement invoice delete karna chahte hain?`)) {
+      setCashSaleSettlements(prev => {
+        const updated = prev.filter(s => s.id !== settlementId);
+        if (saveCashSaleSettlements) saveCashSaleSettlements(updated);
+        return updated;
+      });
+      if (showToast) showToast(`Truck ${truckNo || ''} ka invoice delete kar diya gaya`, 'info');
+    }
+  };
+
+  // Delete Single Supplier's Khata (all settlements & payments for this supplier)
+  const handleDeleteSupplierKhata = (sName) => {
+    if (!sName) return;
+    if (window.confirm(`Kya aap "${sName}" ka Party Khata data (Settlements aur Payments) delete karna chahte hain?`)) {
+      const norm = sName.trim().toLowerCase();
+      setCashSaleSettlements(prev => {
+        const updated = prev.filter(s => (s.supplier_name || '').trim().toLowerCase() !== norm);
+        if (saveCashSaleSettlements) saveCashSaleSettlements(updated);
+        return updated;
+      });
+      setCashSalePayments(prev => {
+        const updated = prev.filter(p => (p.supplier_name || '').trim().toLowerCase() !== norm);
+        if (saveCashSalePayments) saveCashSalePayments(updated);
+        return updated;
+      });
+      if (setSupplierProfiles) {
+        setSupplierProfiles(prev => prev.filter(sp => (sp.supplier_name || '').trim().toLowerCase() !== norm));
+      }
+      if (selectedSuppName && selectedSuppName.trim().toLowerCase() === norm) {
+        setSelectedSuppName(null);
+      }
+      if (showToast) showToast(`"${sName}" ka Party Khata delete kar diya gaya! 🗑️`, 'info');
     }
   };
 
@@ -341,7 +405,7 @@ function CashSaleAdminPage({
   // Current selected supplier details
   const selectedSuppProfile = activeSuppliers.find(
     s => (s.supplier_name || '').trim().toLowerCase() === (selectedSuppName || '').trim().toLowerCase()
-  ) || { supplier_name: selectedSuppName, phone: '', city: 'Azadpur Mandi, Delhi' };
+  ) || { supplier_name: selectedSuppName, phone: '' };
 
   const currentStats = selectedSuppName ? getSupplierStats(selectedSuppName) : null;
 
@@ -577,47 +641,84 @@ function CashSaleAdminPage({
                   color: 'var(--text-main)',
                   letterSpacing: '-0.02em'
                 }}>
-                  Cash Sale Ledger
+                  Party Khata
                 </h1>
                 <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  Active Supplier Profiles • Net Invoice History, Payment Records & Settlement Tracking
+                  Party & Supplier Profiles • Net Invoice History, Payment Records & Settlement Tracking
                 </div>
               </div>
             </div>
 
-            <button
-              onClick={() => {
-                setPayForm({
-                  date: sysDate,
-                  amount: '',
-                  payment_method: 'CASH',
-                  reference: '',
-                  notes: '',
-                  truck_no: '',
-                  supplier_name: activeSuppliers[0]?.supplier_name || ''
-                });
-                setSelInvoice(null);
-                setPayFormOpen(true);
-              }}
-              style={{
-                padding: '10px 22px',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '12px',
-                fontWeight: 800,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 4px 15px rgba(245,158,11,0.3)',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <DollarSign size={17} />
-              <span>+ Record Payment (Jama)</span>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setDeleteAllModalOpen(true)}
+                style={{
+                  padding: '10px 18px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  color: '#ef4444',
+                  border: '1.5px solid rgba(239, 68, 68, 0.35)',
+                  borderRadius: '12px',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 8px rgba(239,68,68,0.08)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#ef4444';
+                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.borderColor = '#ef4444';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.color = '#ef4444';
+                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+                }}
+                title="Party Khata ka saara data delete karein"
+              >
+                <Trash2 size={16} />
+                <span>Delete All Data</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPayForm({
+                    date: sysDate,
+                    amount: '',
+                    payment_method: 'CASH',
+                    reference: '',
+                    notes: '',
+                    truck_no: '',
+                    supplier_name: activeSuppliers[0]?.supplier_name || ''
+                  });
+                  setSelInvoice(null);
+                  setPayFormOpen(true);
+                }}
+                style={{
+                  padding: '10px 22px',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontWeight: 800,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 15px rgba(245,158,11,0.3)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <DollarSign size={17} />
+                <span>+ Record Payment (Jama)</span>
+              </button>
+            </div>
           </div>
 
           {/* Global KPI Summary Row */}
@@ -784,16 +885,46 @@ function CashSaleAdminPage({
                     }}
                   >
                     <div>
-                      {/* Tag from Image 1: SUPPLIERS */}
+                      {/* Tag from Image 1: SUPPLIERS + Quick Delete */}
                       <div style={{
-                        fontSize: '0.74rem',
-                        fontWeight: 900,
-                        color: '#d97706',
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
                         marginBottom: '10px'
                       }}>
-                        SUPPLIERS
+                        <div style={{
+                          fontSize: '0.74rem',
+                          fontWeight: 900,
+                          color: '#d97706',
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase'
+                        }}>
+                          SUPPLIERS
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSupplierKhata(supp.supplier_name);
+                          }}
+                          title={`Delete ${supp.supplier_name} khata`}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            borderRadius: '6px',
+                            opacity: 0.65,
+                            display: 'flex',
+                            alignItems: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.opacity = '0.65'; e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
 
                       {/* Supplier Name from Image 1: piyush */}
@@ -910,6 +1041,38 @@ function CashSaleAdminPage({
               </select>
 
               <button
+                type="button"
+                onClick={() => handleDeleteSupplierKhata(selectedSuppName)}
+                style={{
+                  padding: '9px 16px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  color: '#ef4444',
+                  border: '1.5px solid rgba(239, 68, 68, 0.35)',
+                  borderRadius: '10px',
+                  fontWeight: 800,
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#ef4444';
+                  e.currentTarget.style.color = '#fff';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.color = '#ef4444';
+                }}
+                title={`Delete all records for ${selectedSuppName}`}
+              >
+                <Trash2 size={15} />
+                <span>Delete Khata</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   setPayForm({
                     date: sysDate,
@@ -1290,6 +1453,42 @@ function CashSaleAdminPage({
                           }}>
                             {isCompleted ? '✓ Completed (Settled)' : (truckItem.paidForTruck > 0 ? '⚡ Partial Paid' : '⏳ Active / Pending')}
                           </span>
+
+                          {!isUnsettled && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSettlement(truckItem.id, truckItem.truck_no);
+                              }}
+                              title="Delete this truck invoice"
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid rgba(239, 68, 68, 0.25)',
+                                color: '#ef4444',
+                                cursor: 'pointer',
+                                padding: '4px 10px',
+                                borderRadius: '16px',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.15s ease'
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)';
+                                e.currentTarget.style.borderColor = '#ef4444';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+                              }}
+                            >
+                              <Trash2 size={13} />
+                              <span>Delete</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -1599,6 +1798,129 @@ function CashSaleAdminPage({
           )}
         </div>
       )}
+
+      {/* ===================================================================== */}
+      {/* DELETE ALL CONFIRMATION MODAL                                         */}
+      {/* ===================================================================== */}
+      {deleteAllModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: 'var(--bg-surface, #ffffff)',
+            borderRadius: '20px',
+            maxWidth: '480px',
+            width: '100%',
+            padding: '28px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            border: '1.5px solid rgba(239, 68, 68, 0.3)',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '14px',
+                background: 'rgba(239, 68, 68, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ef4444',
+                flexShrink: 0
+              }}>
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main, #1e293b)' }}>
+                  Delete All Party Khata Data?
+                </h3>
+                <div style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 700, marginTop: '2px' }}>
+                  ⚠️ This action cannot be undone
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary, #64748b)', lineHeight: 1.6, margin: '0 0 18px 0' }}>
+              Kya aap Party Khata ka saara data delete karna chahte hain? Isse sabhi <b>Net Invoices, Truck Settlements</b> aur <b>Jama Payment Records</b> delete ho jayenge aur saare pending balances zero ho jayenge.
+            </p>
+
+            {setSupplierProfiles && (
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 14px',
+                background: 'rgba(239, 68, 68, 0.05)',
+                borderRadius: '10px',
+                border: '1px dashed rgba(239, 68, 68, 0.3)',
+                cursor: 'pointer',
+                marginBottom: '20px'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={includeProfilesInDelete}
+                  onChange={e => setIncludeProfilesInDelete(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: '#ef4444', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main, #1e293b)' }}>
+                  Supplier directory profiles (jaise abcd, piyush) ko bhi list se hatayein
+                </span>
+              </label>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setDeleteAllModalOpen(false)}
+                style={{
+                  padding: '9px 18px',
+                  background: 'transparent',
+                  border: '1.5px solid var(--border-subtle, #cbd5e1)',
+                  borderRadius: '10px',
+                  color: 'var(--text-main, #334155)',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteAllPartyKhata}
+                style={{
+                  padding: '9px 20px',
+                  background: '#ef4444',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: '#fff',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 14px rgba(239,68,68,0.35)'
+                }}
+              >
+                <Trash2 size={16} />
+                <span>Yes, Delete All Data</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1829,11 +2151,23 @@ export default function DashboardView({
   const [cashSaleSupplier, setCashSaleSupplier] = useState(null); // active supplier for sidebar
   const [cashSaleSettlements, setCashSaleSettlements] = useState(() => {
     try {
+      const resetDone = localStorage.getItem('mandi_party_khata_reset_v3');
+      if (!resetDone) {
+        localStorage.removeItem('mandi_cash_sale_settlements');
+        localStorage.removeItem('mandi_cash_sale_payments');
+        localStorage.removeItem('mandi_truck_settlements');
+        localStorage.setItem('mandi_party_khata_reset_v3', 'true');
+        return [];
+      }
       return JSON.parse(localStorage.getItem('mandi_cash_sale_settlements')) || [];
     } catch { return []; }
   });
   const [cashSalePayments, setCashSalePayments] = useState(() => {
     try {
+      const resetDone = localStorage.getItem('mandi_party_khata_reset_v3');
+      if (!resetDone) {
+        return [];
+      }
       return JSON.parse(localStorage.getItem('mandi_cash_sale_payments')) || [];
     } catch { return []; }
   });
@@ -1886,7 +2220,7 @@ export default function DashboardView({
     setCashSaleSupplier(supplier);
     setCashSidebarTab('invoices');
     setIsCashSaleSidebarOpen(true);
-    if (showToast) showToast(`Settlement saved! Cash Sale Ledger mein Net Invoice ₹${invoiceTotal.toLocaleString()} record ho gaya. 💰`, 'success');
+    if (showToast) showToast(`Settlement saved! Party Khata mein Net Invoice ₹${invoiceTotal.toLocaleString()} record ho gaya. 💰`, 'success');
   };
 
   const handleCashPaymentSave = (e) => {
@@ -2034,11 +2368,13 @@ export default function DashboardView({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
+          const resetDone = localStorage.getItem('mandi_sales_prices_cleaned_v2');
           return parsed
             .filter(p => !['Maa Fruits Mandi Traders', 'Royal Kashmir Orchards'].includes(p.supplier_name))
             .map(p => ({
               ...p,
-              variety: p.variety === 'Grade A' ? '' : (p.variety || '')
+              variety: p.variety === 'Grade A' ? '' : (p.variety || ''),
+              balance_box: !resetDone ? Number(p.boxes || p.balance_box || 0) : Number(p.balance_box !== undefined ? p.balance_box : p.boxes || 0)
             }));
         }
       }
@@ -2116,6 +2452,64 @@ export default function DashboardView({
       localStorage.setItem('mandi_clean_slate_v7', 'true');
       setSupplierProfiles([]);
     }
+
+    const isKhataCleaned = localStorage.getItem('mandi_party_khata_reset_v3');
+    if (!isKhataCleaned) {
+      localStorage.removeItem('mandi_cash_sale_settlements');
+      localStorage.removeItem('mandi_cash_sale_payments');
+      localStorage.removeItem('mandi_truck_settlements');
+      localStorage.setItem('mandi_party_khata_reset_v3', 'true');
+      setCashSaleSettlements([]);
+      setCashSalePayments([]);
+    }
+
+    const isSalesCleaned = localStorage.getItem('mandi_sales_prices_cleaned_v2');
+    if (!isSalesCleaned) {
+      localStorage.removeItem('mandi_truck_sales');
+      localStorage.setItem('mandi_truck_sales', '[]');
+      setTruckSalesList([]);
+
+      // Reset customer buy histories & balances
+      const savedCust = localStorage.getItem('mandi_customer_profiles');
+      if (savedCust) {
+        try {
+          const parsed = JSON.parse(savedCust);
+          if (Array.isArray(parsed)) {
+            const cleanedCust = parsed.map(c => ({
+              ...c,
+              total_boxes: 0,
+              total_bought: 0,
+              total_paid: 0,
+              current_balance: 0,
+              khata_balance: 0,
+              total_pending: 0,
+              buy_history: [],
+              payment_history: []
+            }));
+            localStorage.setItem('mandi_customer_profiles', JSON.stringify(cleanedCust));
+            setCustomerProfiles(cleanedCust);
+          }
+        } catch {}
+      }
+
+      // Restore lot balances
+      const savedSupp = localStorage.getItem('dashboard_supplier_profiles');
+      if (savedSupp) {
+        try {
+          const parsed = JSON.parse(savedSupp);
+          if (Array.isArray(parsed)) {
+            const cleanedSupp = parsed.map(p => ({
+              ...p,
+              balance_box: Number(p.boxes || p.total_boxes || p.balance_box || 0)
+            }));
+            localStorage.setItem('dashboard_supplier_profiles', JSON.stringify(cleanedSupp));
+            setSupplierProfiles(cleanedSupp);
+          }
+        } catch {}
+      }
+
+      localStorage.setItem('mandi_sales_prices_cleaned_v2', 'true');
+    }
   }, []);
 
 
@@ -2128,7 +2522,20 @@ export default function DashboardView({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed.filter(c => !['Sharma Fruits Wholesale', 'FreshMart Hypermarkets', 'Golden Tree Dry Fruits & Sweets'].includes(c.customer_name));
+          const resetDone = localStorage.getItem('mandi_sales_prices_cleaned_v2');
+          return parsed
+            .filter(c => !['Sharma Fruits Wholesale', 'FreshMart Hypermarkets', 'Golden Tree Dry Fruits & Sweets'].includes(c.customer_name))
+            .map(c => (!resetDone ? {
+              ...c,
+              total_boxes: 0,
+              total_bought: 0,
+              total_paid: 0,
+              current_balance: 0,
+              khata_balance: 0,
+              total_pending: 0,
+              buy_history: [],
+              payment_history: []
+            } : c));
         }
       }
     } catch {
@@ -2150,6 +2557,12 @@ export default function DashboardView({
   // Truck-wise fruit sales history (persisted in localStorage)
   const [truckSalesList, setTruckSalesList] = useState(() => {
     try {
+      const resetDone = localStorage.getItem('mandi_sales_prices_cleaned_v2');
+      if (!resetDone) {
+        localStorage.removeItem('mandi_truck_sales');
+        localStorage.setItem('mandi_sales_prices_cleaned_v2', 'true');
+        return [];
+      }
       const saved = localStorage.getItem('mandi_truck_sales');
       if (saved) return JSON.parse(saved);
     } catch {
@@ -2218,7 +2631,7 @@ export default function DashboardView({
   const [newCustomerForm, setNewCustomerForm] = useState({
     customer_name: '',
     phone: '',
-    city: '',
+    address: '',
     opening_balance: ''
   });
 
@@ -2685,7 +3098,7 @@ export default function DashboardView({
           id: c.id,
           customer_name: c.customer_name,
           phone: c.phone || '',
-          city: c.city || 'Delhi',
+          address: c.address || '',
           current_balance: c.current_balance || 0,
           total_boxes: 0,
           total_bought: 0,
@@ -3120,7 +3533,7 @@ export default function DashboardView({
         customer_code: `CUST-${Date.now().toString().slice(-4)}`,
         customer_name: name,
         phone: (newCustomerForm.phone || '').trim(),
-        city: (newCustomerForm.city || '').trim(),
+        address: (newCustomerForm.address || '').trim(),
         status: 'ACTIVE',
         current_balance: openBal
       };
@@ -3139,7 +3552,7 @@ export default function DashboardView({
       id: createdCustId,
       customer_name: name,
       phone: (newCustomerForm.phone || '').trim(),
-      city: (newCustomerForm.city || '').trim(),
+      address: (newCustomerForm.address || '').trim(),
       current_balance: openBal,
       total_boxes: 0,
       total_bought: openBal,
@@ -3162,7 +3575,7 @@ export default function DashboardView({
     setCustomerProfiles(prev => [newCust, ...prev]);
     setSelectedCustomerForView(newCust);
     setIsAddCustomerOpen(false);
-    setNewCustomerForm({ customer_name: '', phone: '', city: '', opening_balance: '' });
+    setNewCustomerForm({ customer_name: '', phone: '', address: '', opening_balance: '' });
     if (onRefresh) onRefresh();
     if (showToast) {
       showToast(`Customer profile "${name}" saved to MySQL Database! 👤💾`, 'success');
@@ -3178,7 +3591,6 @@ export default function DashboardView({
       id: cust.id,
       customer_name: cust.customer_name || '',
       phone: cust.phone || '',
-      city: cust.city || 'Delhi Mandi',
       address: cust.address || ''
     });
     setIsEditCustomerOpen(true);
@@ -3201,7 +3613,6 @@ export default function DashboardView({
         await api.patch(`/customers/${custId}/`, {
           customer_name: cleanName,
           phone: (editCustomerForm.phone || '').trim(),
-          city: (editCustomerForm.city || '').trim(),
           address: (editCustomerForm.address || '').trim()
         }).catch(() => null);
       }
@@ -3209,7 +3620,6 @@ export default function DashboardView({
       const updatedCust = {
         customer_name: cleanName,
         phone: (editCustomerForm.phone || '').trim(),
-        city: (editCustomerForm.city || '').trim(),
         address: (editCustomerForm.address || '').trim()
       };
 
@@ -3715,859 +4125,886 @@ Branch: ${supp.branch_name || 'N/A'}`;
         purchasesList={purchasesList}
         showToast={showToast}
         getSystemDate={getSystemDate}
+        supplierProfiles={supplierProfiles}
+        setSupplierProfiles={setSupplierProfiles}
       />
     );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-      {/* ----------------------------------------------------------------- */}
-      {/* Top Header Banner with Customer Details Button */}
-      {/* ----------------------------------------------------------------- */}
-      <div className="welcome-banner" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Apple size={24} color="#10b981" />
-            <span>Profile Manager</span>
-          </h1>
-          <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '4px' }}>
-            Fast Supplier Entry • Click Card to Sell • Unified Customer Profiles
-          </p>
-        </div>
+      <BoardPageView
+        supplierProfiles={supplierProfiles}
+        setSupplierProfiles={setSupplierProfiles}
+        truckSalesList={truckSalesList}
+        setTruckSalesList={setTruckSalesList}
+        salesList={salesList}
+        customerProfiles={customerProfiles}
+        setCustomerProfiles={setCustomerProfiles}
+        suppliers={suppliers}
+        setSuppliers={setSuppliers}
+        customers={customers}
+        setCustomers={setCustomers}
+        showToast={showToast}
+        setIsCustomerModalOpen={setIsCustomerModalOpen}
+        setIsSupplierTrucksModalOpen={setIsSupplierTrucksModalOpen}
+        saveFruitAndVariety={saveFruitAndVariety}
+        savedFruitNames={savedFruitNames}
+        savedFruitVarieties={savedFruitVarieties}
+        currentUser={currentUser}
+      />
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div className="truck-stat-pill" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <span className="stat-label" style={{ color: '#94a3b8' }}>Total Profiles</span>
-            <span className="stat-val" style={{ color: '#fff' }}>{supplierProfiles.length}</span>
+      {false && (
+        <>
+          {/* ----------------------------------------------------------------- */}
+          {/* Top Header Banner with Customer Details Button */}
+          {/* ----------------------------------------------------------------- */}
+          <div className="welcome-banner" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div>
+              <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Apple size={24} color="#10b981" />
+                <span>Profile Manager</span>
+              </h1>
+              <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '4px' }}>
+                Fast Supplier Entry • Click Card to Sell • Unified Customer Profiles
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="truck-stat-pill" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <span className="stat-label" style={{ color: '#94a3b8' }}>Total Profiles</span>
+                <span className="stat-val" style={{ color: '#fff' }}>{supplierProfiles.length}</span>
+              </div>
+
+              <div className="truck-stat-pill highlight-gold" style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.35)' }}>
+                <span className="stat-label" style={{ color: '#fbbf24' }}>Total Balance Boxes</span>
+                <span className="stat-val" style={{ color: '#f59e0b' }}>{totalBalanceBoxes.toLocaleString()} BX</span>
+              </div>
+
+              {/* Customer Details Top Button */}
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setIsCustomerModalOpen(true);
+                  if (customerProfiles.length > 0 && !selectedCustomerForView) {
+                    setSelectedCustomerForView(customerProfiles[0]);
+                  }
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(59, 130, 246, 0.35)'
+                }}
+                title="Click to view all customer details, buy & payment histories"
+              >
+                <Users size={17} />
+                <span>Customer Profiles & Details</span>
+              </button>
+
+              {/* Supplier Profiles & Trucks Top Button */}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setIsSupplierTrucksModalOpen(true);
+                  if (unifiedSuppliers.length > 0 && !selectedSupplierForDetail) {
+                    setSelectedSupplierForDetail(unifiedSuppliers[0]);
+                  }
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                }}
+                title="Click to view Supplier Profiles, Passbooks & Trucks"
+              >
+                <Truck size={17} />
+                <span>Supplier Profiles & Trucks</span>
+              </button>
+            </div>
           </div>
 
-          <div className="truck-stat-pill highlight-gold" style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.35)' }}>
-            <span className="stat-label" style={{ color: '#fbbf24' }}>Total Balance Boxes</span>
-            <span className="stat-val" style={{ color: '#f59e0b' }}>{totalBalanceBoxes.toLocaleString()} BX</span>
-          </div>
-
-          {/* Customer Details Top Button */}
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              setIsCustomerModalOpen(true);
-              if (customerProfiles.length > 0 && !selectedCustomerForView) {
-                setSelectedCustomerForView(customerProfiles[0]);
-              }
-            }}
-            style={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-              color: '#ffffff',
-              border: 'none',
-              padding: '9px 18px',
-              borderRadius: '10px',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(59, 130, 246, 0.35)'
-            }}
-            title="Click to view all customer details, buy & payment histories"
+          {/* ----------------------------------------------------------------- */}
+          {/* 1. Main Action Div: Click to Add Supplier & Delivery Details */}
+          {/* ----------------------------------------------------------------- */}
+          <div
+            id="supplier-entry-section"
+            className="add-supplier-trigger-card"
+            onClick={() => setIsFormOpen(!isFormOpen)}
+            title="Click to toggle Add Supplier form"
           >
-            <Users size={17} />
-            <span>Customer Profiles & Details</span>
-          </button>
-
-          {/* Supplier Profiles & Trucks Top Button */}
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => {
-              setIsSupplierTrucksModalOpen(true);
-              if (unifiedSuppliers.length > 0 && !selectedSupplierForDetail) {
-                setSelectedSupplierForDetail(unifiedSuppliers[0]);
-              }
-            }}
-            style={{
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: '#ffffff',
-              border: 'none',
-              padding: '9px 18px',
-              borderRadius: '10px',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
-            }}
-            title="Click to view Supplier Profiles, Passbooks & Trucks"
-          >
-            <Truck size={17} />
-            <span>Supplier Profiles & Trucks</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ----------------------------------------------------------------- */}
-      {/* 1. Main Action Div: Click to Add Supplier & Delivery Details */}
-      {/* ----------------------------------------------------------------- */}
-      <div
-        id="supplier-entry-section"
-        className="add-supplier-trigger-card"
-        onClick={() => setIsFormOpen(!isFormOpen)}
-        title="Click to toggle Add Supplier form"
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.35)'
-          }}>
-            <Plus size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>
-              Lot Delivery Entry
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            className="btn btn-secondary btn-sm"
-            style={{ pointerEvents: 'none' }}
-          >
-            {isFormOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            <span>{isFormOpen ? 'Collapse Form' : 'Expand Form'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ----------------------------------------------------------------- */}
-      {/* 2. Expanded Supplier Entry Form Panel */}
-      {/* ----------------------------------------------------------------- */}
-      {isFormOpen && (
-        <form onSubmit={handleSaveSupplier} className="supplier-entry-panel">
-          {/* Security & Database Status Ribbon */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '8px 12px',
-            background: 'rgba(16, 185, 129, 0.08)',
-            borderRadius: '8px',
-            border: '1px solid rgba(16, 185, 129, 0.25)',
-            marginBottom: '14px',
-            fontSize: '0.78rem',
-            flexWrap: 'wrap',
-            gap: '8px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontWeight: 700 }}>
-              <ShieldCheck size={14} />
-              <span>Authenticated Session ({currentUser?.username || 'admin'})</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
-              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
-              <span>Direct MySQL Database Storage (fruit_erp_db)</span>
-            </div>
-          </div>
-
-          {/* Section A: Supplier Details & Passbook */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <User size={16} color="#3b82f6" />
-              <span style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                1. Supplier Information
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-              {/* Supplier Name with Autocomplete */}
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontWeight: 700 }}>
-                  Supplier Name * <span style={{ fontSize: '0.72rem', color: '#3b82f6' }}>(Type for auto-suggest)</span>
-                </label>
-                <div className="supplier-autocomplete-wrapper" ref={suggestionRef}>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="e.g. Maa Fruits Mandi Traders"
-                      value={form.supplier_name}
-                      onChange={(e) => handleSupplierNameChange(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      onFocus={() => form.supplier_name && handleSupplierNameChange(form.supplier_name)}
-                      required
-                      autoComplete="off"
-                    />
-                    {form.supplier_name && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setForm(prev => ({ ...prev, supplier_name: '' }));
-                          setSuggestions([]);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          right: '8px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          background: 'none',
-                          border: 'none',
-                          color: '#94a3b8',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Suggestion Dropdown */}
-                  {showSuggestions && suggestions.length > 0 && (
-                    <ul className="supplier-suggestions-dropdown">
-                      {suggestions.map((s, idx) => (
-                        <li
-                          key={s.id || idx}
-                          className={`suggestion-item ${idx === activeSuggestionIndex ? 'active' : ''}`}
-                          onClick={() => handleSelectSuggestion(s)}
-                        >
-                          <div>
-                            <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.88rem' }}>
-                              {s.supplier_name}
-                            </div>
-                            <div className="supplier-meta">
-                              📞 {s.phone || 'No phone'} • 🏛️ {s.bank_name || 'Bank details saved'}
-                            </div>
-                          </div>
-                          <span className="badge badge-info" style={{ fontSize: '0.68rem' }}>
-                            Press Enter ↵
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              {/* Phone Number */}
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Phone Number</label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="tel"
-                    className="form-control"
-                    placeholder="e.g. 9876543210"
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  />
-                  <Phone size={14} color="#94a3b8" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
-
-          {/* Section B: Delivery & Produce Details */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Truck size={16} color="#10b981" />
-              <span style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                2. Delivery & Produce Details
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Arrival Date *</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Truck No.</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. WB12A1234 (Empty = 0000000)"
-                  value={form.truckno}
-                  onChange={(e) => setForm({ ...form, truckno: e.target.value.toUpperCase() })}
-                />
-              </div>
-
-              {/* Fruit Name with Smart Dynamic Autocomplete & Enter Selection */}
-              <div className="form-group" style={{ margin: 0, position: 'relative' }} ref={fruitRef}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label className="form-label" style={{ margin: 0 }}>Fruit Name *</label>
-
-                </div>
-                <input
-                  ref={fruitInputRef}
-                  type="text"
-                  className="form-control"
-                  value={form.fruit}
-                  onChange={(e) => handleFruitChange(e.target.value)}
-                  onFocus={() => handleFruitChange(form.fruit)}
-                  onKeyDown={handleFruitKeyDown}
-                  autoComplete="off"
-                  required
-                />
-                {showFruitSuggestions && fruitSuggestions.length > 0 && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      zIndex: 1050,
-                      background: 'var(--bg-surface)',
-                      border: '1.5px solid #10b981',
-                      borderRadius: '10px',
-                      boxShadow: '0 12px 28px rgba(0,0,0,0.22)',
-                      maxHeight: '220px',
-                      overflowY: 'auto',
-                      marginTop: '4px'
-                    }}
-                  >
-                    <div style={{ padding: '6px 10px', fontSize: '0.7rem', color: 'var(--text-secondary)', background: 'var(--bg-main)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>SAVED FRUITS ({fruitSuggestions.length})</span>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>↵ Enter to enter</span>
-                    </div>
-                    {fruitSuggestions.map((item, idx) => {
-                      const isActive = idx === activeFruitIndex;
-                      return (
-                        <div
-                          key={item}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            handleSelectFruit(item);
-                          }}
-                          style={{
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            background: isActive ? 'rgba(16, 185, 129, 0.16)' : 'transparent',
-                            borderLeft: isActive ? '3px solid #10b981' : '3px solid transparent',
-                            color: 'var(--text-main)',
-                            fontWeight: isActive ? 800 : 600,
-                            fontSize: '0.86rem'
-                          }}
-                        >
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span>🍎</span>
-                            <span>{item}</span>
-                          </span>
-                          <span style={{ fontSize: '0.72rem', color: '#10b981', opacity: isActive ? 1 : 0.6 }}>
-                            ↵ Select
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Fruit Variety with Smart Dynamic Autocomplete & Enter Selection */}
-              <div className="form-group" style={{ margin: 0, position: 'relative' }} ref={varietyRef}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label className="form-label" style={{ margin: 0 }}>Fruit Variety</label>
-
-                </div>
-                <input
-                  ref={varietyInputRef}
-                  type="text"
-                  className="form-control"
-                  value={form.variety}
-                  onChange={(e) => handleVarietyChange(e.target.value)}
-                  onFocus={() => handleVarietyChange(form.variety)}
-                  onKeyDown={handleVarietyKeyDown}
-                  autoComplete="off"
-                />
-                {showVarietySuggestions && varietySuggestions.length > 0 && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      zIndex: 1050,
-                      background: 'var(--bg-surface)',
-                      border: '1.5px solid #10b981',
-                      borderRadius: '10px',
-                      boxShadow: '0 12px 28px rgba(0,0,0,0.22)',
-                      maxHeight: '220px',
-                      overflowY: 'auto',
-                      marginTop: '4px'
-                    }}
-                  >
-                    <div style={{ padding: '6px 10px', fontSize: '0.7rem', color: 'var(--text-secondary)', background: 'var(--bg-main)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>SAVED VARIETIES ({varietySuggestions.length})</span>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>↵ Enter to enter</span>
-                    </div>
-                    {varietySuggestions.map((item, idx) => {
-                      const isActive = idx === activeVarietyIndex;
-                      return (
-                        <div
-                          key={item}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            handleSelectVariety(item);
-                          }}
-                          style={{
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            background: isActive ? 'rgba(16, 185, 129, 0.16)' : 'transparent',
-                            borderLeft: isActive ? '3px solid #10b981' : '3px solid transparent',
-                            color: 'var(--text-main)',
-                            fontWeight: isActive ? 800 : 600,
-                            fontSize: '0.86rem'
-                          }}
-                        >
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span>🌿</span>
-                            <span>{item}</span>
-                          </span>
-                          <span style={{ fontSize: '0.72rem', color: '#10b981', opacity: isActive ? 1 : 0.6 }}>
-                            ↵ Select
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontWeight: 800, color: '#10b981' }}>
-                  Boxes *
-                </label>
-                <input
-                  ref={boxesInputRef}
-                  type="number"
-                  inputMode="numeric"
-                  min="1"
-                  className="form-control"
-                  style={{ fontWeight: 800, color: '#10b981', fontSize: '1.05rem' }}
-
-                  value={form.boxes}
-                  onChange={(e) => setForm({ ...form, boxes: e.target.value })}
-                  required
-                />
-              </div>
-
-              {/* Damage Box Option */}
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontWeight: 800, color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>Damage Box</span>
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  className="form-control"
-                  style={{
-                    fontWeight: 800,
-                    color: Number(form.damage_boxes) > 0 ? '#ef4444' : 'var(--text-main)',
-                    fontSize: '1.05rem',
-                    borderColor: Number(form.damage_boxes) > 0 ? '#ef4444' : undefined,
-                    background: Number(form.damage_boxes) > 0 ? 'rgba(239, 68, 68, 0.05)' : undefined
-                  }}
-                  placeholder="e.g. 0"
-                  value={form.damage_boxes}
-                  onChange={(e) => setForm({ ...form, damage_boxes: e.target.value })}
-                />
-              </div>
-            </div>
-
-            {/* Live Inward & Damage Hisab Bar */}
-            {Number(form.boxes) > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
-                marginTop: '12px',
-                padding: '9px 14px',
-                background: 'rgba(16, 185, 129, 0.08)',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
-                borderRadius: '8px',
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.35)'
+              }}>
+                <Plus size={22} />
+              </div>
+              <div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                  Lot Delivery Entry
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ pointerEvents: 'none' }}
+              >
+                {isFormOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                <span>{isFormOpen ? 'Collapse Form' : 'Expand Form'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* ----------------------------------------------------------------- */}
+          {/* 2. Expanded Supplier Entry Form Panel */}
+          {/* ----------------------------------------------------------------- */}
+          {isFormOpen && (
+            <form onSubmit={handleSaveSupplier} className="supplier-entry-panel">
+              {/* Security & Database Status Ribbon */}
+              <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                fontSize: '0.84rem',
-                fontWeight: 700,
+                padding: '8px 12px',
+                background: 'rgba(16, 185, 129, 0.08)',
+                borderRadius: '8px',
+                border: '1px solid rgba(16, 185, 129, 0.25)',
+                marginBottom: '14px',
+                fontSize: '0.78rem',
                 flexWrap: 'wrap',
                 gap: '8px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>📦 Inward Hisab:</span>
-                  <strong style={{ color: 'var(--text-main)' }}>{form.boxes} Total Boxes</strong>
-                  {Number(form.damage_boxes) > 0 && (
-                    <span style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 800 }}>
-                      ⚠️ {form.damage_boxes} Damage Box
-                    </span>
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontWeight: 700 }}>
+                  <ShieldCheck size={14} />
+                  <span>Authenticated Session ({currentUser?.username || 'admin'})</span>
                 </div>
-                <div style={{ color: '#059669', fontSize: '0.92rem', fontWeight: 800 }}>
-                  Available Balance: {Math.max(0, (Number(form.boxes) || 0) - (Number(form.damage_boxes) || 0))} Boxes
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
+                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
+                  <span>Direct MySQL Database Storage (fruit_erp_db)</span>
                 </div>
+              </div>
+
+              {/* Section A: Supplier Details & Passbook */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <User size={16} color="#3b82f6" />
+                  <span style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    1. Supplier Information
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+                  {/* Supplier Name with Autocomplete */}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontWeight: 700 }}>
+                      Supplier Name * <span style={{ fontSize: '0.72rem', color: '#3b82f6' }}>(Type for auto-suggest)</span>
+                    </label>
+                    <div className="supplier-autocomplete-wrapper" ref={suggestionRef}>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="e.g. Maa Fruits Mandi Traders"
+                          value={form.supplier_name}
+                          onChange={(e) => handleSupplierNameChange(e.target.value)}
+                          onKeyDown={handleKeyDown}
+                          onFocus={() => form.supplier_name && handleSupplierNameChange(form.supplier_name)}
+                          required
+                          autoComplete="off"
+                        />
+                        {form.supplier_name && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm(prev => ({ ...prev, supplier_name: '' }));
+                              setSuggestions([]);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              right: '8px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'none',
+                              border: 'none',
+                              color: '#94a3b8',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Suggestion Dropdown */}
+                      {showSuggestions && suggestions.length > 0 && (
+                        <ul className="supplier-suggestions-dropdown">
+                          {suggestions.map((s, idx) => (
+                            <li
+                              key={s.id || idx}
+                              className={`suggestion-item ${idx === activeSuggestionIndex ? 'active' : ''}`}
+                              onClick={() => handleSelectSuggestion(s)}
+                            >
+                              <div>
+                                <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.88rem' }}>
+                                  {s.supplier_name}
+                                </div>
+                                <div className="supplier-meta">
+                                  📞 {s.phone || 'No phone'} • 🏛️ {s.bank_name || 'Bank details saved'}
+                                </div>
+                              </div>
+                              <span className="badge badge-info" style={{ fontSize: '0.68rem' }}>
+                                Press Enter ↵
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Phone Number */}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Phone Number</label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="tel"
+                        className="form-control"
+                        placeholder="e.g. 9876543210"
+                        value={form.phone}
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                      />
+                      <Phone size={14} color="#94a3b8" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
+
+              {/* Section B: Delivery & Produce Details */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <Truck size={16} color="#10b981" />
+                  <span style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    2. Delivery & Produce Details
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Arrival Date *</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={form.date}
+                      onChange={(e) => setForm({ ...form, date: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Truck No.</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="e.g. WB12A1234 (Empty = 0000000)"
+                      value={form.truckno}
+                      onChange={(e) => setForm({ ...form, truckno: e.target.value.toUpperCase() })}
+                    />
+                  </div>
+
+                  {/* Fruit Name with Smart Dynamic Autocomplete & Enter Selection */}
+                  <div className="form-group" style={{ margin: 0, position: 'relative' }} ref={fruitRef}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label className="form-label" style={{ margin: 0 }}>Fruit Name *</label>
+
+                    </div>
+                    <input
+                      ref={fruitInputRef}
+                      type="text"
+                      className="form-control"
+                      value={form.fruit}
+                      onChange={(e) => handleFruitChange(e.target.value)}
+                      onFocus={() => handleFruitChange(form.fruit)}
+                      onKeyDown={handleFruitKeyDown}
+                      autoComplete="off"
+                      required
+                    />
+                    {showFruitSuggestions && fruitSuggestions.length > 0 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          zIndex: 1050,
+                          background: 'var(--bg-surface)',
+                          border: '1.5px solid #10b981',
+                          borderRadius: '10px',
+                          boxShadow: '0 12px 28px rgba(0,0,0,0.22)',
+                          maxHeight: '220px',
+                          overflowY: 'auto',
+                          marginTop: '4px'
+                        }}
+                      >
+                        <div style={{ padding: '6px 10px', fontSize: '0.7rem', color: 'var(--text-secondary)', background: 'var(--bg-main)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>SAVED FRUITS ({fruitSuggestions.length})</span>
+                          <span style={{ color: '#10b981', fontWeight: 700 }}>↵ Enter to enter</span>
+                        </div>
+                        {fruitSuggestions.map((item, idx) => {
+                          const isActive = idx === activeFruitIndex;
+                          return (
+                            <div
+                              key={item}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleSelectFruit(item);
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: isActive ? 'rgba(16, 185, 129, 0.16)' : 'transparent',
+                                borderLeft: isActive ? '3px solid #10b981' : '3px solid transparent',
+                                color: 'var(--text-main)',
+                                fontWeight: isActive ? 800 : 600,
+                                fontSize: '0.86rem'
+                              }}
+                            >
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>🍎</span>
+                                <span>{item}</span>
+                              </span>
+                              <span style={{ fontSize: '0.72rem', color: '#10b981', opacity: isActive ? 1 : 0.6 }}>
+                                ↵ Select
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fruit Variety with Smart Dynamic Autocomplete & Enter Selection */}
+                  <div className="form-group" style={{ margin: 0, position: 'relative' }} ref={varietyRef}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label className="form-label" style={{ margin: 0 }}>Fruit Variety</label>
+
+                    </div>
+                    <input
+                      ref={varietyInputRef}
+                      type="text"
+                      className="form-control"
+                      value={form.variety}
+                      onChange={(e) => handleVarietyChange(e.target.value)}
+                      onFocus={() => handleVarietyChange(form.variety)}
+                      onKeyDown={handleVarietyKeyDown}
+                      autoComplete="off"
+                    />
+                    {showVarietySuggestions && varietySuggestions.length > 0 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          zIndex: 1050,
+                          background: 'var(--bg-surface)',
+                          border: '1.5px solid #10b981',
+                          borderRadius: '10px',
+                          boxShadow: '0 12px 28px rgba(0,0,0,0.22)',
+                          maxHeight: '220px',
+                          overflowY: 'auto',
+                          marginTop: '4px'
+                        }}
+                      >
+                        <div style={{ padding: '6px 10px', fontSize: '0.7rem', color: 'var(--text-secondary)', background: 'var(--bg-main)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>SAVED VARIETIES ({varietySuggestions.length})</span>
+                          <span style={{ color: '#10b981', fontWeight: 700 }}>↵ Enter to enter</span>
+                        </div>
+                        {varietySuggestions.map((item, idx) => {
+                          const isActive = idx === activeVarietyIndex;
+                          return (
+                            <div
+                              key={item}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleSelectVariety(item);
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: isActive ? 'rgba(16, 185, 129, 0.16)' : 'transparent',
+                                borderLeft: isActive ? '3px solid #10b981' : '3px solid transparent',
+                                color: 'var(--text-main)',
+                                fontWeight: isActive ? 800 : 600,
+                                fontSize: '0.86rem'
+                              }}
+                            >
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>🌿</span>
+                                <span>{item}</span>
+                              </span>
+                              <span style={{ fontSize: '0.72rem', color: '#10b981', opacity: isActive ? 1 : 0.6 }}>
+                                ↵ Select
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontWeight: 800, color: '#10b981' }}>
+                      Boxes *
+                    </label>
+                    <input
+                      ref={boxesInputRef}
+                      type="number"
+                      inputMode="numeric"
+                      min="1"
+                      className="form-control"
+                      style={{ fontWeight: 800, color: '#10b981', fontSize: '1.05rem' }}
+
+                      value={form.boxes}
+                      onChange={(e) => setForm({ ...form, boxes: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  {/* Damage Box Option */}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontWeight: 800, color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Damage Box</span>
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      className="form-control"
+                      style={{
+                        fontWeight: 800,
+                        color: Number(form.damage_boxes) > 0 ? '#ef4444' : 'var(--text-main)',
+                        fontSize: '1.05rem',
+                        borderColor: Number(form.damage_boxes) > 0 ? '#ef4444' : undefined,
+                        background: Number(form.damage_boxes) > 0 ? 'rgba(239, 68, 68, 0.05)' : undefined
+                      }}
+                      placeholder="e.g. 0"
+                      value={form.damage_boxes}
+                      onChange={(e) => setForm({ ...form, damage_boxes: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* Live Inward & Damage Hisab Bar */}
+                {Number(form.boxes) > 0 && (
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '9px 14px',
+                    background: 'rgba(16, 185, 129, 0.08)',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    flexWrap: 'wrap',
+                    gap: '8px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>📦 Inward Hisab:</span>
+                      <strong style={{ color: 'var(--text-main)' }}>{form.boxes} Total Boxes</strong>
+                      {Number(form.damage_boxes) > 0 && (
+                        <span style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 800 }}>
+                          ⚠️ {form.damage_boxes} Damage Box
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ color: '#059669', fontSize: '0.92rem', fontWeight: 800 }}>
+                      Available Balance: {Math.max(0, (Number(form.boxes) || 0) - (Number(form.damage_boxes) || 0))} Boxes
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Submit Action */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setForm({
+                      supplier_name: '',
+                      phone: '',
+                      bank_name: '',
+                      account_number: '',
+                      ifsc_code: '',
+                      branch_name: '',
+                      date: getSystemDate(),
+                      truckno: '',
+                      fruit: '',
+                      variety: '',
+                      boxes: '',
+                      damage_boxes: ''
+                    });
+                    setShowSuggestions(false);
+                  }}
+                >
+                  Clear Fields
+                </button>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                    padding: '10px 24px',
+                    fontSize: '0.92rem'
+                  }}
+                  disabled={isSubmitting}
+                >
+                  <CheckCircle size={16} />
+                  <span>{isSubmitting ? 'Saving Profile...' : 'Save & Create Supplier Profile'}</span>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ----------------------------------------------------------------- */}
+          {/* 3. Automatic Supplier Profiles Display Section */}
+          {/* (Clicking ANY profile card opens the Sale Modal for that produce) */}
+          {/* ----------------------------------------------------------------- */}
+          <div className="glass-panel" style={{ margin: 0 }}>
+            <div className="panel-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
+              <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <Layers size={18} color="#10b981" />
+                <span>Active Supplier Profiles & Balance Boxes</span>
+                <span className="badge badge-success" style={{ fontSize: '0.74rem', padding: '3px 8px' }}>
+                  {activeProfilesCount} Active
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Quick Filter Tabs: Active (default: excludes 0 balance) | Completed | All */}
+                <div style={{
+                  display: 'flex',
+                  background: 'var(--bg-main)',
+                  padding: '3px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-subtle)',
+                  gap: '3px'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setProfileStatusFilter('ACTIVE')}
+                    style={{
+                      padding: '5px 12px',
+                      fontSize: '0.76rem',
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: profileStatusFilter === 'ACTIVE' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
+                      color: profileStatusFilter === 'ACTIVE' ? '#fff' : 'var(--text-secondary)',
+                      fontWeight: profileStatusFilter === 'ACTIVE' ? 800 : 600,
+                      boxShadow: profileStatusFilter === 'ACTIVE' ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Active ({activeProfilesCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProfileStatusFilter('COMPLETED')}
+                    title="View all completed truck profiles with 0 balance (All history preserved)"
+                    style={{
+                      padding: '5px 12px',
+                      fontSize: '0.76rem',
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: profileStatusFilter === 'COMPLETED' ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)' : 'transparent',
+                      color: profileStatusFilter === 'COMPLETED' ? '#fff' : 'var(--text-secondary)',
+                      fontWeight: profileStatusFilter === 'COMPLETED' ? 800 : 600,
+                      boxShadow: profileStatusFilter === 'COMPLETED' ? '0 2px 8px rgba(100, 116, 139, 0.3)' : 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Completed / 0 Bal ({completedProfilesCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProfileStatusFilter('ALL')}
+                    style={{
+                      padding: '5px 12px',
+                      fontSize: '0.76rem',
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: profileStatusFilter === 'ALL' ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' : 'transparent',
+                      color: profileStatusFilter === 'ALL' ? '#fff' : 'var(--text-secondary)',
+                      fontWeight: profileStatusFilter === 'ALL' ? 800 : 600,
+                      boxShadow: profileStatusFilter === 'ALL' ? '0 2px 8px rgba(59, 130, 246, 0.3)' : 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    All ({supplierProfiles.length})
+                  </button>
+                </div>
+
+                <div style={{ position: 'relative', width: '220px' }}>
+                  <input
+                    type="text"
+                    placeholder="Search supplier, fruit, truck..."
+                    className="form-control"
+                    style={{ paddingLeft: '28px', fontSize: '0.8rem' }}
+                    value={profileSearch}
+                    onChange={(e) => setProfileSearch(e.target.value)}
+                  />
+                  <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)' }} />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleClearAllActiveProfiles}
+                  title="Clear all profiles from Active Supplier Profiles & Balance Boxes"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '6px 12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    color: '#ef4444',
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    height: '36px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.16)';
+                    e.currentTarget.style.borderColor = '#ef4444';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+                  }}
+                >
+                  <Trash2 size={13} />
+                  <span>Clear All</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Profiles Grid */}
+            {filteredProfiles.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-secondary)' }}>
+                <User size={38} color="#94a3b8" style={{ margin: '0 auto 10px auto', display: 'block', opacity: 0.5 }} />
+                <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>
+                  {profileStatusFilter === 'ACTIVE'
+                    ? 'No Active Supplier Profiles With Remaining Balance'
+                    : profileStatusFilter === 'COMPLETED'
+                      ? 'No Completed (0 Balance) Truck Profiles'
+                      : 'No Supplier Profiles Found'}
+                </div>
+                <p style={{ fontSize: '0.82rem', marginTop: '4px' }}>
+                  {profileStatusFilter === 'ACTIVE'
+                    ? 'Jis truck ka balance 0 ho jata hai wo automatic yahan se hat jata hai. Completed lots dekhne ke liye upar "Completed / 0 Bal" button dabayein.'
+                    : 'Fill the inward form above to create a new delivery lot.'}
+                </p>
+              </div>
+            ) : (
+              <div className="supplier-profiles-grid">
+                {filteredProfiles.map(profile => (
+                  <div
+                    key={profile.id}
+                    className="supplier-profile-card clickable"
+                    onClick={() => handleOpenSaleModal(profile)}
+                    title={Number(profile.balance_box || 0) <= 0 ? 'Lot completed with 0 balance (Details preserved)' : 'Click anywhere on this profile card to sell produce'}
+                  >
+                    {/* Profile Card Header */}
+                    <div className="profile-card-header">
+                      <div>
+                        <div className="profile-supplier-name">
+                          {profile.supplier_name}
+                        </div>
+                        <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>📞 {profile.phone || 'No phone'}</span>
+                          <span>•</span>
+                          <span>📅 {profile.date}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="badge badge-neutral" style={{ fontFamily: 'monospace', fontSize: '0.74rem' }}>
+                          {profile.truckno} {Number(profile.balance_box || 0) <= 0 ? '• 0 BAL' : ''}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteActiveProfile(profile);
+                          }}
+                          title={`Delete profile for ${profile.supplier_name} (${profile.truckno})`}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            color: '#ef4444',
+                            borderRadius: '6px',
+                            padding: '4px 6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                            e.currentTarget.style.borderColor = '#ef4444';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Fruit & Variety Name */}
+                    <div style={{
+                      padding: '10px 12px',
+                      background: 'rgba(59, 130, 246, 0.08)',
+                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <Apple size={20} color="#3b82f6" />
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>
+                          Fruit & Variety
+                        </span>
+                        <div style={{ fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                          {profile.fruit || ''}{profile.variety && profile.variety.trim() ? ` — ${profile.variety.trim()}` : ''}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Details Grid: Truck No & Passbook */}
+                    <div className="profile-detail-grid">
+                      <div>
+                        <div className="profile-field-label">Truck Number</div>
+                        <div className="profile-field-value" style={{ fontFamily: 'monospace', color: '#3b82f6' }}>
+                          {profile.truckno}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="profile-field-label">Arrival Date</div>
+                        <div className="profile-field-value" style={{ fontSize: '0.85rem' }}>
+                          {profile.date}
+                        </div>
+                      </div>
+
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <div className="profile-field-label">Bank Passbook</div>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-main)', fontWeight: 600, marginTop: '2px' }}>
+                          {profile.bank_name ? `${profile.bank_name} (${profile.account_number ? `A/C •••${profile.account_number.slice(-4)}` : 'A/C Active'})` : 'No bank passbook recorded'}
+                        </div>
+                        {profile.ifsc_code && (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                            IFSC: {profile.ifsc_code} {profile.branch_name ? `• ${profile.branch_name}` : ''}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Balance Box Highlight Badge */}
+                    <div className="balance-box-badge" style={{
+                      background: Number(profile.balance_box || 0) <= 0 ? 'rgba(100, 116, 139, 0.1)' : undefined,
+                      borderColor: Number(profile.balance_box || 0) <= 0 ? 'rgba(100, 116, 139, 0.3)' : undefined
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Package size={20} color={Number(profile.balance_box || 0) <= 0 ? '#64748b' : undefined} />
+                        <span style={{ fontSize: '0.84rem', color: Number(profile.balance_box || 0) <= 0 ? '#64748b' : undefined }}>Balance Box:</span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span className="val" style={{ color: Number(profile.balance_box || 0) <= 0 ? '#64748b' : undefined }}>
+                          {profile.balance_box} Boxes
+                        </span>
+                        {Number(profile.damage_boxes) > 0 && (
+                          <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 700, marginTop: '2px' }}>
+                            ⚠️ {profile.damage_boxes} Damage | {profile.boxes} Total
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Click to Sell Prompt / Completed Badge */}
+                    <div className="card-sell-prompt" style={{
+                      background: Number(profile.balance_box || 0) <= 0 ? 'rgba(100, 116, 139, 0.12)' : undefined,
+                      color: Number(profile.balance_box || 0) <= 0 ? '#64748b' : undefined
+                    }}>
+                      {Number(profile.balance_box || 0) <= 0 ? (
+                        <>
+                          <Check size={15} color="#10b981" />
+                          <span style={{ fontWeight: 800 }}>✓ Lot Completed (0 BX Remaining • All Details Preserved)</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart size={15} />
+                          <span>Click to Sell ({profile.balance_box} BX Available)</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-
-          {/* Submit Action */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '6px' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => {
-                setForm({
-                  supplier_name: '',
-                  phone: '',
-                  bank_name: '',
-                  account_number: '',
-                  ifsc_code: '',
-                  branch_name: '',
-                  date: getSystemDate(),
-                  truckno: '',
-                  fruit: '',
-                  variety: '',
-                  boxes: '',
-                  damage_boxes: ''
-                });
-                setShowSuggestions(false);
-              }}
-            >
-              Clear Fields
-            </button>
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
-                padding: '10px 24px',
-                fontSize: '0.92rem'
-              }}
-              disabled={isSubmitting}
-            >
-              <CheckCircle size={16} />
-              <span>{isSubmitting ? 'Saving Profile...' : 'Save & Create Supplier Profile'}</span>
-            </button>
-          </div>
-        </form>
+        </>
       )}
-
-      {/* ----------------------------------------------------------------- */}
-      {/* 3. Automatic Supplier Profiles Display Section */}
-      {/* (Clicking ANY profile card opens the Sale Modal for that produce) */}
-      {/* ----------------------------------------------------------------- */}
-      <div className="glass-panel" style={{ margin: 0 }}>
-        <div className="panel-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
-          <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <Layers size={18} color="#10b981" />
-            <span>Active Supplier Profiles & Balance Boxes</span>
-            <span className="badge badge-success" style={{ fontSize: '0.74rem', padding: '3px 8px' }}>
-              {activeProfilesCount} Active
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Quick Filter Tabs: Active (default: excludes 0 balance) | Completed | All */}
-            <div style={{
-              display: 'flex',
-              background: 'var(--bg-main)',
-              padding: '3px',
-              borderRadius: '8px',
-              border: '1px solid var(--border-subtle)',
-              gap: '3px'
-            }}>
-              <button
-                type="button"
-                onClick={() => setProfileStatusFilter('ACTIVE')}
-                style={{
-                  padding: '5px 12px',
-                  fontSize: '0.76rem',
-                  borderRadius: '6px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: profileStatusFilter === 'ACTIVE' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
-                  color: profileStatusFilter === 'ACTIVE' ? '#fff' : 'var(--text-secondary)',
-                  fontWeight: profileStatusFilter === 'ACTIVE' ? 800 : 600,
-                  boxShadow: profileStatusFilter === 'ACTIVE' ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                Active ({activeProfilesCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setProfileStatusFilter('COMPLETED')}
-                title="View all completed truck profiles with 0 balance (All history preserved)"
-                style={{
-                  padding: '5px 12px',
-                  fontSize: '0.76rem',
-                  borderRadius: '6px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: profileStatusFilter === 'COMPLETED' ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)' : 'transparent',
-                  color: profileStatusFilter === 'COMPLETED' ? '#fff' : 'var(--text-secondary)',
-                  fontWeight: profileStatusFilter === 'COMPLETED' ? 800 : 600,
-                  boxShadow: profileStatusFilter === 'COMPLETED' ? '0 2px 8px rgba(100, 116, 139, 0.3)' : 'none',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                Completed / 0 Bal ({completedProfilesCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setProfileStatusFilter('ALL')}
-                style={{
-                  padding: '5px 12px',
-                  fontSize: '0.76rem',
-                  borderRadius: '6px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: profileStatusFilter === 'ALL' ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' : 'transparent',
-                  color: profileStatusFilter === 'ALL' ? '#fff' : 'var(--text-secondary)',
-                  fontWeight: profileStatusFilter === 'ALL' ? 800 : 600,
-                  boxShadow: profileStatusFilter === 'ALL' ? '0 2px 8px rgba(59, 130, 246, 0.3)' : 'none',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                All ({supplierProfiles.length})
-              </button>
-            </div>
-
-            <div style={{ position: 'relative', width: '220px' }}>
-              <input
-                type="text"
-                placeholder="Search supplier, fruit, truck..."
-                className="form-control"
-                style={{ paddingLeft: '28px', fontSize: '0.8rem' }}
-                value={profileSearch}
-                onChange={(e) => setProfileSearch(e.target.value)}
-              />
-              <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)' }} />
-            </div>
-
-            <button
-              type="button"
-              onClick={handleClearAllActiveProfiles}
-              title="Clear all profiles from Active Supplier Profiles & Balance Boxes"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 12px',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                color: '#ef4444',
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                height: '36px'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.16)';
-                e.currentTarget.style.borderColor = '#ef4444';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
-              }}
-            >
-              <Trash2 size={13} />
-              <span>Clear All</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Profiles Grid */}
-        {filteredProfiles.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-secondary)' }}>
-            <User size={38} color="#94a3b8" style={{ margin: '0 auto 10px auto', display: 'block', opacity: 0.5 }} />
-            <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>
-              {profileStatusFilter === 'ACTIVE'
-                ? 'No Active Supplier Profiles With Remaining Balance'
-                : profileStatusFilter === 'COMPLETED'
-                  ? 'No Completed (0 Balance) Truck Profiles'
-                  : 'No Supplier Profiles Found'}
-            </div>
-            <p style={{ fontSize: '0.82rem', marginTop: '4px' }}>
-              {profileStatusFilter === 'ACTIVE'
-                ? 'Jis truck ka balance 0 ho jata hai wo automatic yahan se hat jata hai. Completed lots dekhne ke liye upar "Completed / 0 Bal" button dabayein.'
-                : 'Fill the inward form above to create a new delivery lot.'}
-            </p>
-          </div>
-        ) : (
-          <div className="supplier-profiles-grid">
-            {filteredProfiles.map(profile => (
-              <div
-                key={profile.id}
-                className="supplier-profile-card clickable"
-                onClick={() => handleOpenSaleModal(profile)}
-                title={Number(profile.balance_box || 0) <= 0 ? 'Lot completed with 0 balance (Details preserved)' : 'Click anywhere on this profile card to sell produce'}
-              >
-                {/* Profile Card Header */}
-                <div className="profile-card-header">
-                  <div>
-                    <div className="profile-supplier-name">
-                      {profile.supplier_name}
-                    </div>
-                    <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span>📞 {profile.phone || 'No phone'}</span>
-                      <span>•</span>
-                      <span>📅 {profile.date}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="badge badge-neutral" style={{ fontFamily: 'monospace', fontSize: '0.74rem' }}>
-                      {profile.truckno} {Number(profile.balance_box || 0) <= 0 ? '• 0 BAL' : ''}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteActiveProfile(profile);
-                      }}
-                      title={`Delete profile for ${profile.supplier_name} (${profile.truckno})`}
-                      style={{
-                        background: 'rgba(239, 68, 68, 0.08)',
-                        border: '1px solid rgba(239, 68, 68, 0.25)',
-                        color: '#ef4444',
-                        borderRadius: '6px',
-                        padding: '4px 6px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.15s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                        e.currentTarget.style.borderColor = '#ef4444';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-                        e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
-                      }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Fruit & Variety Name */}
-                <div style={{
-                  padding: '10px 12px',
-                  background: 'rgba(59, 130, 246, 0.08)',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}>
-                  <Apple size={20} color="#3b82f6" />
-                  <div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>
-                      Fruit & Variety
-                    </span>
-                    <div style={{ fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                      {profile.fruit || ''}{profile.variety && profile.variety.trim() ? ` — ${profile.variety.trim()}` : ''}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Details Grid: Truck No & Passbook */}
-                <div className="profile-detail-grid">
-                  <div>
-                    <div className="profile-field-label">Truck Number</div>
-                    <div className="profile-field-value" style={{ fontFamily: 'monospace', color: '#3b82f6' }}>
-                      {profile.truckno}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="profile-field-label">Arrival Date</div>
-                    <div className="profile-field-value" style={{ fontSize: '0.85rem' }}>
-                      {profile.date}
-                    </div>
-                  </div>
-
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <div className="profile-field-label">Bank Passbook</div>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--text-main)', fontWeight: 600, marginTop: '2px' }}>
-                      {profile.bank_name ? `${profile.bank_name} (${profile.account_number ? `A/C •••${profile.account_number.slice(-4)}` : 'A/C Active'})` : 'No bank passbook recorded'}
-                    </div>
-                    {profile.ifsc_code && (
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                        IFSC: {profile.ifsc_code} {profile.branch_name ? `• ${profile.branch_name}` : ''}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Balance Box Highlight Badge */}
-                <div className="balance-box-badge" style={{
-                  background: Number(profile.balance_box || 0) <= 0 ? 'rgba(100, 116, 139, 0.1)' : undefined,
-                  borderColor: Number(profile.balance_box || 0) <= 0 ? 'rgba(100, 116, 139, 0.3)' : undefined
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Package size={20} color={Number(profile.balance_box || 0) <= 0 ? '#64748b' : undefined} />
-                    <span style={{ fontSize: '0.84rem', color: Number(profile.balance_box || 0) <= 0 ? '#64748b' : undefined }}>Balance Box:</span>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <span className="val" style={{ color: Number(profile.balance_box || 0) <= 0 ? '#64748b' : undefined }}>
-                      {profile.balance_box} Boxes
-                    </span>
-                    {Number(profile.damage_boxes) > 0 && (
-                      <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 700, marginTop: '2px' }}>
-                        ⚠️ {profile.damage_boxes} Damage | {profile.boxes} Total
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Click to Sell Prompt / Completed Badge */}
-                <div className="card-sell-prompt" style={{
-                  background: Number(profile.balance_box || 0) <= 0 ? 'rgba(100, 116, 139, 0.12)' : undefined,
-                  color: Number(profile.balance_box || 0) <= 0 ? '#64748b' : undefined
-                }}>
-                  {Number(profile.balance_box || 0) <= 0 ? (
-                    <>
-                      <Check size={15} color="#10b981" />
-                      <span style={{ fontWeight: 800 }}>✓ Lot Completed (0 BX Remaining • All Details Preserved)</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart size={15} />
-                      <span>Click to Sell ({profile.balance_box} BX Available)</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* ----------------------------------------------------------------- */}
       {/* 4. Sale Entry Modal (Opens when clicking any supplier profile card) */}
@@ -4699,7 +5136,7 @@ Branch: ${supp.branch_name || 'N/A'}`;
                                     {c.customer_name}
                                   </div>
                                   <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                                    📞 {c.phone || 'No phone'} • 📍 {c.city || 'Delhi'}
+                                    📞 {c.phone || 'No phone'}{c.address ? ` • 📍 ${c.address}` : ''}
                                   </div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
@@ -5229,8 +5666,12 @@ Branch: ${supp.branch_name || 'N/A'}`;
                                 textOverflow: 'ellipsis'
                               }}>
                                 <span>📞 {c.phone || 'No phone'}</span>
-                                <span>•</span>
-                                <span>📍 {c.city || 'Delhi'}</span>
+                                {c.address ? (
+                                  <>
+                                    <span>•</span>
+                                    <span>📍 {c.address}</span>
+                                  </>
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -5448,10 +5889,14 @@ Branch: ${supp.branch_name || 'N/A'}`;
                       <ShieldCheck size={11} /> Authenticated • MySQL Live
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
                     <span>📞 {selectedCustomerForView.phone || 'No phone'}</span>
-                    <span>•</span>
-                    <span>📍 {selectedCustomerForView.city || 'Delhi Mandi'}</span>
+                    {selectedCustomerForView.address ? (
+                      <>
+                        <span>•</span>
+                        <span>📍 {selectedCustomerForView.address}</span>
+                      </>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -5870,6 +6315,16 @@ Branch: ${supp.branch_name || 'N/A'}`;
                   />
                 </div>
 
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Customer Address (Optional)</label>
+                  <textarea
+                    className="form-control"
+                    rows="2"
+                    placeholder="Enter customer / shop address (optional)"
+                    value={newCustomerForm.address}
+                    onChange={(e) => setNewCustomerForm({ ...newCustomerForm, address: e.target.value })}
+                  />
+                </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Opening Due Balance (if any ₹)</label>
@@ -5956,17 +6411,6 @@ Branch: ${supp.branch_name || 'N/A'}`;
                     onChange={(e) => setEditCustomerForm({ ...editCustomerForm, phone: e.target.value })}
                   />
                 </div>
-
-                {/* <div className="form-group" style={{ margin: 0 }}> */}
-                {/* <label className="form-label">City / Mandi Location</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. Delhi Mandi / Azadpur"
-                  value={editCustomerForm.city}
-                  onChange={(e) => setEditCustomerForm({ ...editCustomerForm, city: e.target.value })}
-                />
-                </div> */}
 
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Address / Shop Details</label>
@@ -8009,7 +8453,7 @@ Branch: ${supp.branch_name || 'N/A'}`;
             </div>
             <div>
               <div style={{ fontWeight: 900, fontSize: '1rem', color: '#fff', letterSpacing: '-0.01em' }}>
-                Cash Sale Ledger
+                Party Khata
               </div>
               <div style={{ fontSize: '0.74rem', color: 'rgba(255,255,255,0.82)', marginTop: '1px' }}>
                 {cashSaleSupplier?.supplier_name || 'Supplier'} • Net Invoice History

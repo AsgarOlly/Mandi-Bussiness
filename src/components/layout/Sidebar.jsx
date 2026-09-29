@@ -37,7 +37,7 @@ export default function Sidebar({
     },
     {
       id: 'cash-sale',
-      label: 'Cash Sale Ledger',
+      label: 'Party Khata',
       subtitle: 'Net Invoice & Payments',
       icon: Banknote,
       badge: 'New',
